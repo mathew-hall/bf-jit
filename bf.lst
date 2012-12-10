@@ -1,0 +1,114 @@
+     1                                  %macro jumpifzero 1
+     2                                  	mov ebx, [prog]
+     3                                  	mov edx, [dp]
+     4                                  	
+     5                                  	mov eax, [ebx + edx]
+     6                                  	test eax, eax
+     7                                  	je %1
+     8                                  %endmacro
+     9                                  
+    10                                  %macro jumpifnzero 1
+    11                                  	mov ebx, [prog]
+    12                                  	mov edx, [dp]
+    13                                  	
+    14                                  	mov eax, [ebx + edx]
+    15                                  	test eax, eax
+    16                                  	jne %1
+    17                                  %endmacro
+    18                                  
+    19                                  
+    20                                  	extern _printf
+    21                                  	
+    22                                  	
+    23                                  	SECTION .data
+    24 00000000 686920776F726C6400      somestring:	db "hi world",0
+    25 00000009 256300                  charout:	db "%c",0
+    26                                  
+    27                                  	SECTION .text
+    28                                  	global _main
+    29                                  	
+    30                                  deceval:
+    31 00000000 8B1D[04000000]          	mov ebx, [prog]
+    32 00000006 8B15[00000000]          	mov edx, [dp]
+    33 0000000C FE0C1A                  	dec byte [edx + ebx]
+    34                                  	
+    35 0000000F C3                      	ret
+    36                                  	
+    37                                  inceval:
+    38 00000010 8B1D[04000000]          	mov ebx, [prog]
+    39 00000016 8B15[00000000]          	mov edx, [dp]
+    40 0000001C FE041A                  	inc byte [edx + ebx]
+    41                                  	
+    42 0000001F C3                      	ret
+    43                                  	
+    44                                  incdp:
+    45 00000020 A1[00000000]            	mov eax, [dp]
+    46 00000025 40                      	inc eax
+    47 00000026 BB[00000000]            	mov ebx, dp
+    48 0000002B 8903                    	mov [ebx], eax
+    49                                  	
+    50 0000002D C3                      	ret
+    51                                  	
+    52                                  decdp:
+    53 0000002E A1[00000000]            	mov eax, [dp]
+    54 00000033 48                      	dec eax
+    55 00000034 BB[00000000]            	mov ebx, dp
+    56 00000039 8903                    	mov [ebx], eax
+    57 0000003B C3                      	ret
+    58                                  	
+    59                                  	
+    60                                  printout:
+    61                                  	;stack is at 0x********4
+    62                                  
+    63 0000003C 8B1D[04000000]          	mov ebx, [prog]
+    64 00000042 8B15[00000000]          	mov edx, [dp]
+    65                                  	
+    66 00000048 81EC0C000000            	sub esp, 0xC; stupid alignment bullshit
+    67 0000004E 8A0413                  	mov al, byte [ebx + edx]
+    68 00000051 50                      	push eax 
+    69 00000052 68[09000000]            	push charout ; c
+    70 00000057 E8(00000000)            	call _printf
+    71                                  	
+    72 0000005C 81C414000000            	add esp, 0x14
+    73                                  
+    74 00000062 C3                      	ret
+    75                                  
+    76                                  
+    77                                  _main:	;stack =   0x*******C
+    78 00000063 55                      	push ebp ; 0x*******8
+    79 00000064 89E5                    	mov ebp, esp
+    80                                  
+    81 00000066 81EC30000000            	sub esp, 0x30
+    82                                  	
+    83 0000006C B8[04000000]            	mov eax, prog
+    84 00000071 8920                    	mov [eax], esp
+    85 00000073 C6042449                	mov byte [esp], 0x49
+    86                                  
+    87 00000077 BA[00000000]            	mov edx, dp
+    88 0000007C C70200000000            	mov dword [edx], 0
+    89                                  	
+    90                                  loops:
+    91 00000082 E8B5FFFFFF              	call printout
+    92 00000087 E874FFFFFF              	call deceval
+    93                                  	jumpifnzero loops
+    94 0000008C 8B1D[04000000]      <1>  mov ebx, [prog]
+    95 00000092 8B15[00000000]      <1>  mov edx, [dp]
+    96                              <1> 
+    97 00000098 8B0413              <1>  mov eax, [ebx + edx]
+    98 0000009B 85C0                <1>  test eax, eax
+    99 0000009D 75E3                <1>  jne %1
+   100                                  	; compiler needs to insert jump targets for loops.
+   101                                  	; to do this in asm we need to count the [s, dec ]s. Store from/to pairs of pointers
+   102                                  	; then use computed indirect branch (jmp [eax])
+   103                                  	
+   104 0000009F 81C430000000            	add esp,0x30
+   105                                  	
+   106 000000A5 5D                      	pop ebp
+   107 000000A6 C3                      	ret
+   108                                  
+   109                                  	
+   110                                  	SECTION .bss
+   111                                  	
+   112 00000000 <res 00000004>          dp resw 2
+   113 00000004 <res 00000004>          prog resw 2
+   114                                  
