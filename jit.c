@@ -20,7 +20,7 @@ enum command{
 char msg[] = "%c";
 typedef struct _codegen_entry{
 	enum command command;
-	uint8_t instrs[40]; //40 for print
+	uint8_t instrs[42]; 
 	uint8_t size;
 	uint8_t dp_linkedits[8];
 	uint8_t num_dps;
@@ -41,10 +41,11 @@ const codegen_entry table[] = {
 		0x8a,0x04,0x13,
 		0x50,
 		0x68,PP,PP,PP,PP,
-		0xe8,PP,PP,PP,PP,
+		0xb8,PP,PP,PP,PP,
+		0xff,0xd0,
 		0x81,0xc4,0x14,0x00,0x00,0x00,
 		0xc3
-		},39, {8}, 1, {2}, 1, 28, 23},
+		},41, {8}, 1, {2}, 1, 28, 23},
 			
 	{VAL_INC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x0c, 0x1a,0xc3}, 16, {8}, 1, {2}, 1, 0, 0},
 	{VAL_DEC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x04, 0x1a,0xc3}, 16, {8}, 1, {2}, 1, 0, 0}
@@ -60,7 +61,7 @@ codegen_entry get_cmd(enum command type){
 	exit(-1);
 }
 
-int emit_instruction(enum command type, uint8_t* dp, uint8_t** mem, uint8_t* dest, uint32_t** fixup){
+int emit_instruction(enum command type, uint32_t* dp, uint8_t** mem, uint8_t* dest, uint32_t** fixup){
 	uint8_t* linktarget;
 	puts("Getting cmd");
 	codegen_entry entry = get_cmd(type);
@@ -93,7 +94,7 @@ int emit_instruction(enum command type, uint8_t* dp, uint8_t** mem, uint8_t* des
 	if(entry.printf_arg != 0){
 		linktarget = dest;
 		linktarget += entry.printf_arg;
-		*((uint32_t*)linktarget) = (uint32_t)&printf;
+		*((uint32_t*)linktarget) = (uint32_t)printf;
 	}
 	puts("Targetted printf");
 	if(entry.target_offset != 0 && type != OUTPUT){

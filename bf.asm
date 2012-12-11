@@ -66,8 +66,9 @@ printout:
 	sub esp, 0xC; stupid alignment bullshit
 	mov al, byte [ebx + edx]
 	push eax 
-	push charout ; c
-	call _printf
+	push charout 
+	mov eax, dword 0xF00FF00F
+	call eax
 	
 	add esp, 0x14
 
