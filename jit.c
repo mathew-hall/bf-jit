@@ -38,23 +38,23 @@ typedef struct _codegen_entry{
 
  
 const codegen_entry table[] = {
-	{PTR_INC, {0xa1,PP,PP,PP,PP,0x40,0xbb,PP,PP,PP,PP,0x89,0x03,0xc3}, 14, {1,7}, 2,{0},0, 0, 0},
-	{PTR_DEC, {0xa1,PP,PP,PP,PP,0x48,0xbb,PP,PP,PP,PP,0x89,0x03,0xc3}, 14, {1,7}, 2,{0},0, 0, 0},
+	{PTR_INC, {0xa1,PP,PP,PP,PP,0x40,0xbb,PP,PP,PP,PP,0x89,0x03}, 13, {1,7}, 2,{0},0, 0, 0},
+	{PTR_DEC, {0xa1,PP,PP,PP,PP,0x48,0xbb,PP,PP,PP,PP,0x89,0x03}, 13, {1,7}, 2,{0},0, 0, 0},
 		
-	{OUTPUT, {0x8b,0x1d,PP,PP,PP,PP,
-		0x8b,0x15,PP,PP,PP,PP,
-		0x81,0xec,0x0c,0x00,0x00,0x00,
-		0x8a,0x04,0x13,
-		0x50,
-		0x68,PP,PP,PP,PP,
-		0xb8,PP,PP,PP,PP,
-		0xff,0xd0,
-		0x81,0xc4,0x14,0x00,0x00,0x00,
-		0xc3
-		},41, {8}, 1, {2}, 1, 28, 23},
+	{OUTPUT, {0x8b,0x1d,PP,PP,PP,PP, //mov edx, [dp]
+		0x8b,0x15,PP,PP,PP,PP, //mov ebx, [mem]
+		0x81,0xec,0x04,0x00,0x00,0x00, //sub esp 0xc
+		0x8a,0x04,0x13, //mov eax, [edx + ebx]
+		0x50, //push eax
+		0x68,PP,PP,PP,PP, //push "%c"
+		0xb8,PP,PP,PP,PP, //mov eax, printf
+		0xff,0xd0, //jmp eax
+		0x81,0xc4,0xc,0x00,0x00,0x00//, //add esp 0x14
+		//0xc3 //ret
+		},40, {8}, 1, {2}, 1, 28, 23},
 			
-	{VAL_INC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x0c, 0x1a,0xc3}, 16, {8}, 1, {2}, 1, 0, 0},
-	{VAL_DEC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x04, 0x1a,0xc3}, 16, {8}, 1, {2}, 1, 0, 0}
+	{VAL_INC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x0c, 0x1a}, 15, {8}, 1, {2}, 1, 0, 0},
+	{VAL_DEC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x04, 0x1a}, 15, {8}, 1, {2}, 1, 0, 0}
 };
 
 codegen_entry get_cmd(enum command type){
@@ -139,7 +139,7 @@ int emit_instruction(enum command type, uint32_t* dp, uint8_t** mem, uint8_t* de
 void hexdump(void* ary, int num){
 	uint8_t* a = (uint8_t*)ary;
 	while(num--){
-		printf("0x%0x ", *a++);
+		printf("0x%02x ", *a++);
 		if(num % 16 == 0)
 			printf("\n");
 	}
@@ -151,7 +151,9 @@ int tokenise(const char* program, enum command* buf, int bufsize){
 	int count = 0;
 	while(*program != '\0'){
 		*buf = get_token(*program);
+		
 		if(*buf != NOP){
+//			printf("%c, %d",*program, count);
 			buf++;
 			count++;
 		}
@@ -219,6 +221,8 @@ int compile(enum command* buf, int bufsize, uint8_t** ram, uint32_t* dp, uint8_t
 		cur_target += sz;
 	}
 	
+	*cur_target= 0xc3; //ret
+	
 	assert(loopnumber == 0);
 	
 	LIST_FOREACH(loop_metadata, &loop_entries, entries){
@@ -256,17 +260,18 @@ int main (int argc, char** argv){
 	
 	*mem = 0x42;
 	
-	int ret = emit_instruction(OUTPUT, &ip, &mem, targ, NULL);
+	//int ret = emit_instruction(OUTPUT, &ip, &mem, targ, NULL);
 	
-	hexdump(targ, 40);
 	
-	enum command* cmdbuf = malloc(30 * sizeof *cmdbuf);
 	
-	int numcmds = tokenise(".", cmdbuf, 30) > 0;
+	enum command* cmdbuf = malloc(3000 * sizeof *cmdbuf);
+	
+	int numcmds = tokenise(".......", cmdbuf, 3000);
+	printf("Parsed %d commands\n", numcmds);
 	assert(numcmds > 0);
 
   	assert(compile(cmdbuf, numcmds, &mem, &ip, targ, 500) > 0);
-	
+	hexdump(targ, 300);
 	run(targ);
 	
 	return 0;
