@@ -54,7 +54,31 @@ const codegen_entry table[] = {
 		},40, {8}, 1, {2}, 1, 28, 23},
 			
 	{VAL_DEC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x0c, 0x1a}, 15, {8}, 1, {2}, 1, 0, 0},
-	{VAL_INC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x04, 0x1a}, 15, {8}, 1, {2}, 1, 0, 0}
+	{VAL_INC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x04, 0x1a}, 15, {8}, 1, {2}, 1, 0, 0},
+			
+	{LOOP_START, {
+		0x8b, 0x1d, PP, PP, PP, PP, //mov ebx, dp
+		0x8b, 0x15, PP, PP, PP, PP, //mov edx, mem
+		0x8b, 0x04, 0x13, //mov eax [edx + ebx]
+		0xbb, PP,PP,PP,PP, //mov ebx target
+		0x85, 0xc0, //test eax,eax
+		0x74, 0x02, //jne $$$$1
+		0xeb, 0x02, //jmp $$$$2
+		0xff, 0xe3, //$$$$1: jmp ebx
+		0x90 //$$$$2: nop
+	}, 29, {8}, 1, {2}, 1, 0, 16},
+	{LOOP_END, {
+		0x8b, 0x1d, PP, PP, PP, PP, //mov ebx, dp
+		0x8b, 0x15, PP, PP, PP, PP, //mov edx, mem
+		0x8b, 0x04, 0x13, //mov eax [edx + ebx]
+		0xbb, PP,PP,PP,PP, //mov ebx target
+		0x85, 0xc0, //test eax,eax
+		0x75, 0x02, //je $$$$1
+		0xeb, 0x02, //jmp $$$$2
+		0xff, 0xe3, //$$$$1: jmp ebx
+		0x90 //$$$$2: nop
+	}, 29, {8}, 1, {2}, 1, 0, 16}		
+			
 };
 
 codegen_entry get_cmd(enum command type){
@@ -240,6 +264,7 @@ void run(void* buffer){
 
         code = code - ((unsigned long)code%getpagesize());
 //        printf("mprotecting page %p\n",code);
+	//Need R W and X because it's likely that code & data will be placed on the same page.
         if(mprotect(code,131,PROT_READ|PROT_WRITE|PROT_EXEC)){
           printf("Ah nuts. %x",errno);
           exit(-1);

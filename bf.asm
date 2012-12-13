@@ -12,8 +12,14 @@
 	mov edx, [dp]
 	
 	mov eax, [ebx + edx]
+	mov ebx, %1
 	test eax, eax
-	jne %1
+	jnz taken
+	jmp short not_taken
+taken:
+	jmp ebx
+not_taken:
+	nop
 %endmacro
 
 
