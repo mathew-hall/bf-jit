@@ -53,8 +53,8 @@ const codegen_entry table[] = {
 		//0xc3 //ret
 		},40, {8}, 1, {2}, 1, 28, 23},
 			
-	{VAL_INC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x0c, 0x1a}, 15, {8}, 1, {2}, 1, 0, 0},
-	{VAL_DEC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x04, 0x1a}, 15, {8}, 1, {2}, 1, 0, 0}
+	{VAL_DEC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x0c, 0x1a}, 15, {8}, 1, {2}, 1, 0, 0},
+	{VAL_INC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x04, 0x1a}, 15, {8}, 1, {2}, 1, 0, 0}
 };
 
 codegen_entry get_cmd(enum command type){
@@ -240,7 +240,7 @@ void run(void* buffer){
 
         code = code - ((unsigned long)code%getpagesize());
 //        printf("mprotecting page %p\n",code);
-        if(mprotect(code,131,PROT_READ|PROT_EXEC)){
+        if(mprotect(code,131,PROT_READ|PROT_WRITE|PROT_EXEC)){
           printf("Ah nuts. %x",errno);
           exit(-1);
         }
@@ -259,14 +259,14 @@ int main (int argc, char** argv){
 	uint32_t ip = 0;
 	
 	*mem = 0x42;
-	
+	mem[1] = 0x45;
 	//int ret = emit_instruction(OUTPUT, &ip, &mem, targ, NULL);
 	
 	
 	
 	enum command* cmdbuf = malloc(3000 * sizeof *cmdbuf);
 	
-	int numcmds = tokenise(".......", cmdbuf, 3000);
+	int numcmds = tokenise(argv[1], cmdbuf, 3000);
 	printf("Parsed %d commands\n", numcmds);
 	assert(numcmds > 0);
 
