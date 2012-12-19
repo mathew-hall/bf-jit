@@ -1,3 +1,6 @@
+; Assembly listing, used to generate opcodes - doesn't actually play a role anymore.
+
+
 %macro jumpifzero 1
 	mov ebx, [prog]
 	mov edx, [dp]
@@ -11,9 +14,9 @@
 	mov ebx, [prog]
 	mov edx, [dp]
 	
-	mov eax, [ebx + edx]
+	mov byte al, [ebx + edx]
 	mov ebx, %1
-	test eax, eax
+	test al, al
 	jnz taken
 	jmp short not_taken
 taken:
@@ -36,14 +39,19 @@ charout:	db "%c",0
 deceval:
 	mov ebx, [prog]
 	mov edx, [dp]
-	dec byte [edx + ebx]
-	
+	mov al, [edx + ebx]
+	dec al
+	mov byte [edx + ebx], al
+
 	ret
 	
 inceval:
 	mov ebx, [prog]
 	mov edx, [dp]
-	inc byte [edx + ebx]
+	mov al, [edx + ebx]
+	inc al
+	mov byte [edx + ebx], al
+
 	
 	ret
 	
@@ -69,7 +77,7 @@ printout:
 	mov ebx, [prog]
 	mov edx, [dp]
 	
-	sub esp, 0xC; stupid alignment bullshit
+	sub esp, 0xC; OSX-specific alignment
 	mov al, byte [ebx + edx]
 	push eax 
 	push charout 
@@ -98,9 +106,7 @@ loops:
 	call printout
 	call deceval
 	jumpifnzero loops
-	; compiler needs to insert jump targets for loops.
-	; to do this in asm we need to count the [s, dec ]s. Store from/to pairs of pointers
-	; then use computed indirect branch (jmp [eax])
+
 	
 	add esp,0x30
 	
