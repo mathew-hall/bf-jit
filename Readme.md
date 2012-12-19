@@ -19,7 +19,7 @@ This was inspired by [Erik's post](http://blog.dubbelboer.com/2012/11/18/brainfu
 
 ### Running:
 
-1. Build (with `buildjit.c`)
+1. Build (with `buildjit.sh`)
 2. Run with a brainfuck program in `argv[1]`, e.g. `./jit '>+++++++++[<++++++++>-]<.>+++++++[<++++>-]<+.+++++++..+++.[-]>++++++++[<++++>-]<.>+++++++++++[<++++++++>-]<-.--------.+++.------.--------.[-]>++++++++[<++++>-]<+.[-]++++++++++.'` (From Speedy's implementation over at [helloworld.org](http://www.helloworld.org))
 
 ##Issues
