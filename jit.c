@@ -7,8 +7,10 @@
 #include <string.h>
 #include <assert.h>
 #include <sys/queue.h>
+#include <signal.h>
 
 
+#define CODE_SIZE 8192
 #define PP 0xFF
 
 enum command{
@@ -52,17 +54,25 @@ const codegen_entry table[] = {
 		0x81,0xc4,0xc,0x00,0x00,0x00//, //add esp 0x14
 		//0xc3 //ret
 		},40, {8}, 1, {2}, 1, 28, 23},
-			
-	{VAL_DEC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x0c, 0x1a}, 15, {8}, 1, {2}, 1, 0, 0},
-	{VAL_INC, {0x8b, 0x1d, PP,PP,PP,PP, 0x8b, 0x15, PP, PP, PP, PP, 0xfe, 0x04, 0x1a}, 15, {8}, 1, {2}, 1, 0, 0},
+	//VAL changes are suspect as they overflow to other bits of memory. Switch to load, modify reg, writeback.
+	{VAL_DEC, {0x8b, 0x1d, PP,PP,PP,PP, 
+		0x8b, 0x15, PP, PP, PP, PP, 
+		0x8a, 0x04, 0x1a,
+		0xfe, 0xc8,
+		0x88, 0x04,0x1a}, 20, {8}, 1, {2}, 1, 0, 0},
+	{VAL_INC, {0x8b, 0x1d, PP,PP,PP,PP, 
+		0x8b, 0x15, PP, PP, PP, PP, 
+		0x8a, 0x04, 0x1a,
+		0xfe, 0xc0,
+		0x88, 0x04,0x1a}, 20, {8}, 1, {2}, 1, 0, 0},
 			
 	{LOOP_START, {
 		0x8b, 0x1d, PP, PP, PP, PP, //mov ebx, dp
 		0x8b, 0x15, PP, PP, PP, PP, //mov edx, mem
-		0x8b, 0x04, 0x13, //mov eax [edx + ebx]
+		0x8a, 0x04, 0x13, //mov eax [edx + ebx] *** THIS NEEDS TO BE mov byte eax [edx + ebx]
 		0xbb, PP,PP,PP,PP, //mov ebx target
-		0x85, 0xc0, //test eax,eax
-		0x74, 0x02, //jne $$$$1
+		0x84, 0xc0, //test eax,eax
+		0x74, 0x02, //je $$$$1
 		0xeb, 0x02, //jmp $$$$2
 		0xff, 0xe3, //$$$$1: jmp ebx
 		0x90 //$$$$2: nop
@@ -70,10 +80,10 @@ const codegen_entry table[] = {
 	{LOOP_END, {
 		0x8b, 0x1d, PP, PP, PP, PP, //mov ebx, dp
 		0x8b, 0x15, PP, PP, PP, PP, //mov edx, mem
-		0x8b, 0x04, 0x13, //mov eax [edx + ebx]
+		0x8a, 0x04, 0x13, //mov eax [edx + ebx]
 		0xbb, PP,PP,PP,PP, //mov ebx target
-		0x85, 0xc0, //test eax,eax
-		0x75, 0x02, //je $$$$1
+		0x84, 0xc0, //test eax,eax
+		0x75, 0x02, //jne $$$$1
 		0xeb, 0x02, //jmp $$$$2
 		0xff, 0xe3, //$$$$1: jmp ebx
 		0x90 //$$$$2: nop
@@ -82,7 +92,7 @@ const codegen_entry table[] = {
 };
 
 codegen_entry get_cmd(enum command type){
-	for(int i = 0; i<sizeof table; i++){
+	for(int i = 0; i<(sizeof table/sizeof table[0]); i++){
 		if(table[i].command == type){
 			return table[i];
 		}
@@ -247,25 +257,28 @@ int compile(enum command* buf, int bufsize, uint8_t** ram, uint32_t* dp, uint8_t
 	
 	*cur_target= 0xc3; //ret
 	
+	count++;
+	
 	assert(loopnumber == 0);
 	
 	LIST_FOREACH(loop_metadata, &loop_entries, entries){
-		*(loop_metadata -> start_fixup) = loop_metadata -> end_addr;
-		*(loop_metadata -> end_fixup) = loop_metadata -> start_addr;
+		
+		*(loop_metadata -> start_fixup) = (uint32_t)loop_metadata -> end_addr;
+		*(loop_metadata -> end_fixup) = (uint32_t)loop_metadata -> start_addr;
 	}
 	
 	return count;
 }
 
 
-void run(void* buffer){
+void run(void* buffer, size_t size){
 	uint8_t* code = buffer;
         unsigned long page_size = getpagesize();
 
         code = code - ((unsigned long)code%getpagesize());
 //        printf("mprotecting page %p\n",code);
 	//Need R W and X because it's likely that code & data will be placed on the same page.
-        if(mprotect(code,131,PROT_READ|PROT_WRITE|PROT_EXEC)){
+        if(mprotect(code,size,PROT_READ|PROT_WRITE|PROT_EXEC)){
           printf("Ah nuts. %x",errno);
           exit(-1);
         }
@@ -276,15 +289,24 @@ void run(void* buffer){
         x();
 }
 
+void flushAndExit(){
+	printf("\nQuitting...\n");
+	fflush(stdout);
+	exit(-1);
+}
+
 int main (int argc, char** argv){
-	uint8_t* targ = malloc(500 * sizeof *targ);
+	signal(SIGINT, flushAndExit);
+	uint8_t* targ = malloc(CODE_SIZE * sizeof *targ);
 	
-	uint8_t* mem = malloc(30000 * sizeof *mem);
+	for(int i=0; i < CODE_SIZE; i++){
+		targ[i] = 0xCC; //fill it with debug traps to make life easier in case we jump out.
+	}
+	
+	uint8_t* mem = calloc(1,30000 * sizeof *mem);
 	
 	uint32_t ip = 0;
 	
-	*mem = 0x42;
-	mem[1] = 0x45;
 	//int ret = emit_instruction(OUTPUT, &ip, &mem, targ, NULL);
 	
 	
@@ -292,12 +314,15 @@ int main (int argc, char** argv){
 	enum command* cmdbuf = malloc(3000 * sizeof *cmdbuf);
 	
 	int numcmds = tokenise(argv[1], cmdbuf, 3000);
-	printf("Parsed %d commands\n", numcmds);
 	assert(numcmds > 0);
+	int codesize = compile(cmdbuf, numcmds, &mem, &ip, targ, CODE_SIZE);
+	
+	free(cmdbuf);
+	cmdbuf = NULL;
 
-  	assert(compile(cmdbuf, numcmds, &mem, &ip, targ, 500) > 0);
-	hexdump(targ, 300);
-	run(targ);
+  	assert(codesize > 0);
+	assert(codesize < CODE_SIZE);
+	run(targ, CODE_SIZE);
 	
 	return 0;
 }
